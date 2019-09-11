@@ -23,6 +23,15 @@ async function playRandomSong (elements, firstTime) {
   performer.textContent = `Performed by ${song.performer}`
 }
 
+function playpause () {
+  const audio = document.getElementById('audio')
+  if (audio.paused) {
+    audio.play()
+  } else {
+    audio.pause()
+  }
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   const audio = document.getElementById('audio')
   const title = document.getElementById('audio-info-title')
