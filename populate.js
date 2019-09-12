@@ -9,12 +9,22 @@ const opts = {
   headers: {
     cookie: `imslp_wiki_session=${process.env.imslp}`
   },
-  body: "[\"Recordings\", 10, false]"
 }
 
-async function getList () {
-  const res = await fetch(url, opts)
-  return res.json()
+async function getList (lastId = false) {
+  if (!process.env.imslp) throw new Error('Need IMSLP session id in env')
+  const body = `["Recordings", 10, ${lastId}]`
+  console.log('Requesting recordings with id %d', lastId)
+  const res = await fetch(url, { ...opts, body })
+  const text = await res.text()
+  let json
+  try {
+    json = JSON.parse(text)
+  } catch (e) {
+    console.error('Not valid JSON:', text)
+    throw e
+  }
+  return json
 }
 
 function parse (list) {
@@ -35,9 +45,12 @@ function parse (list) {
 }
 
 async function deref (track) {
-  console.log('Downloading track to temp-assets:', track.url)
-  const res = await fetch(track.url)
-  res.body.pipe(fs.createWriteStream(`temp-assets/${track.filename}`))
+  return new Promise(async (resolve) => {
+    console.log('Downloading track to temp-assets:', track.url)
+    const res = await fetch(track.url)
+    const stream = res.body.pipe(fs.createWriteStream(`temp-assets/${track.filename}`))
+    stream.on('finish', () => resolve())
+  })
 }
 
 function updateToc (tracks) {
@@ -51,14 +64,31 @@ function updateToc (tracks) {
   console.log('Updated TOC written to temp-toc.json')
 }
 
-async function main () {
-  const list = await getList()
+async function getChannel (lastId) {
+  const list = await getList(lastId)
   const [id, playlist] = list
-  const seenChannels = fs.createWriteStream('./seen')
-  seenChannels.write(id + '\n')
   const tracks = parse(playlist)
   await Promise.all(tracks.map(deref))
   updateToc(tracks)
+  return id
+}
+
+async function main () {
+  const count = Number(process.argv[2])
+  const inputLastId = Number(process.argv[3])
+  if (!count || !inputLastId) {
+    console.log('Usage: populate.js <count> <inputLastId>')
+    process.exit(0)
+  }
+  console.log('Getting %d channels', count)
+  let lastId = inputLastId
+  for (let i = 0; i < count; i++) {
+    lastId = await getChannel(lastId)
+  }
+  console.log('')
+  console.log('Done. Downloaded %d lists, starting from id %d. Last id processed was %d.', count, inputLastId, lastId)
+  console.log('')
+  console.log('You can now copy assets from temp-assets to site/assets and merge temp-toc.json with site/toc.json.')
 }
 
 main()
