@@ -1,14 +1,12 @@
-const ARCHIVE_KEY = 'dat://92838f99f1081237eeab9c6cad1839995428e2a6464896d2a6bb83beb6587b2e'
-
-function getAudioFilePath ({ filename }) {
-  return `${ARCHIVE_KEY}/${filename}`
+async function getToc () {
+  return JSON.parse(await fetch('toc.json').then(res => res.text()) || '[]')
 }
 
 async function playRandomSong (elements, toc, firstTime) {
   const { audio, title, composer, performer } = elements
   const song = toc[Math.floor(Math.random() * toc.length)]
   if (!song) return
-  audio.src = getAudioFilePath(song)
+  audio.src = `/assets/${song.filename}`
   if (!firstTime) audio.play()
 
   title.textContent = `${song.title}`
@@ -23,8 +21,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const performer = document.getElementById('audio-info-performer')
   const elements = { audio, title, composer, performer }
 
-  const archive = await DatArchive.load(ARCHIVE_KEY)
-  const toc = JSON.parse(await archive.readFile('toc.json') || '[]')
+  const toc = await getToc()
 
   playRandomSong(elements, toc, true)
 
